@@ -1,0 +1,54 @@
+services:
+  nginx:
+    platform: linux/amd64
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: doodle-nginx
+    ports:
+      - "80:80"
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  api:
+    platform: linux/amd64
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: doodle-api
+    environment:
+      - QUARKUS_DATASOURCE_DB_KIND=${QUARKUS_DATASOURCE_DB_KIND:-mysql}
+      - QUARKUS_DATASOURCE_USERNAME=${QUARKUS_DATASOURCE_USERNAME:-tlc}
+      - QUARKUS_DATASOURCE_PASSWORD=${QUARKUS_DATASOURCE_PASSWORD:-tlc}
+      - QUARKUS_DATASOURCE_JDBC_URL=${QUARKUS_DATASOURCE_JDBC_URL:-jdbc:mysql://db:3306/tlc?useUnicode=true&serverTimezone=Europe/Paris}
+      - QUARKUS_HIBERNATE_ORM_DATABASE_GENERATION=${QUARKUS_HIBERNATE_ORM_DATABASE_GENERATION:-update}
+      - QUARKUS_MAILER_MOCK=${QUARKUS_MAILER_MOCK:-true}
+      - DOODLE_USEPAD=${DOODLE_USEPAD:-false}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    platform: linux/amd64
+    image: mysql:8
+    container_name: doodle-db
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-root}
+      - MYSQL_DATABASE=${MYSQL_DATABASE:-tlc}
+      - MYSQL_USER=${MYSQL_USER:-tlc}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD:-tlc}
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-root}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+volumes:
+  mysql-data:
+    driver: local

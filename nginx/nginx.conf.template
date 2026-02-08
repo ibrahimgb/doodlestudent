@@ -1,0 +1,28 @@
+upstream api_backend {
+    server api:8080;
+}
+
+server {
+    listen 80;
+    server_name _;
+
+    # Angular static files
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # Angular HTML5 routing — fallback to index.html
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # Proxy /api/* requests to Quarkus backend
+    location /api/ {
+        proxy_pass http://api_backend/api/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 90s;
+        proxy_connect_timeout 90s;
+    }
+}
