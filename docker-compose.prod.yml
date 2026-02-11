@@ -4,8 +4,29 @@ services:
     container_name: doodle-nginx
     ports:
       - "80:80"
+      - "443:443"
+    environment:
+      - DOODLE_DOMAIN=${DOODLE_DOMAIN:?DOODLE_DOMAIN is required}
+    volumes:
+      # Override baked-in nginx config with the SSL-enabled template
+      - ./nginx/nginx-ssl.conf.template:/etc/nginx/templates/default.conf.template:ro
+      # Let's Encrypt certificates
+      - certbot-certs:/etc/letsencrypt:ro
+      # ACME challenge webroot
+      - certbot-www:/var/www/certbot:ro
     depends_on:
       - api
+    restart: unless-stopped
+
+  # --- Certbot: automatic certificate renewal ---
+  certbot:
+    image: certbot/certbot:latest
+    container_name: doodle-certbot
+    volumes:
+      - certbot-certs:/etc/letsencrypt
+      - certbot-www:/var/www/certbot
+    # Attempt renewal every 12 hours (certbot is idempotent)
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot --quiet; sleep 12h & wait $${!}; done'"
     restart: unless-stopped
 
   api:
@@ -48,4 +69,8 @@ services:
 
 volumes:
   mysql-data:
+    driver: local
+  certbot-certs:
+    driver: local
+  certbot-www:
     driver: local
